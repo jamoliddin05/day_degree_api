@@ -1,0 +1,16 @@
+services:
+  init_models:
+    build:
+      context: ./models_init
+      dockerfile: Dockerfile
+    container_name: init_models_container
+    restart: unless-stopped
+    volumes:
+      - ./models_init:/models_init
+
+#  app:
+#    build:
+#      context: ./app
+#      dockerfile: Dockerfile
+#    container_name: app_container
+#    restart: unless-stopped
