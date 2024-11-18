@@ -9,11 +9,10 @@ def hello_world():
     return 'Hello, Docker with Gunicorn and Reloading'
 
 
-@app.route('/', methods=['POST'])
-def fetch_station_data():
+@app.route('/stationID/<string:id>', methods=['GET'])
+def fetch_station_data(id):
     # Step 1: Get the stationID from the request body
-    data = request.get_json()
-    station_id_to_fetch = data.get("stationID")
+    station_id_to_fetch = id
 
     if not station_id_to_fetch:
         return jsonify({"error": "stationID is required"}), 400
