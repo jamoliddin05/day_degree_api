@@ -8,9 +8,13 @@ services:
     volumes:
       - ./models_init:/models_init
 
-#  app:
-#    build:
-#      context: ./app
-#      dockerfile: Dockerfile
-#    container_name: app_container
-#    restart: unless-stopped
+  app:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    container_name: app_container
+    restart: unless-stopped
+    ports:
+      - 5001:5001
+    volumes:
+      - ./app:/app
