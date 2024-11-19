@@ -4,13 +4,18 @@ import pandas as pd
 
 def generate_flux_queries(bucket, measurement, host, station_id, fetch_all=False):
     last_filter = ""
+    TASHKENT_OFFSET_NANOSECONDS = 5 * 60 * 60 * 1_000_000_000  # 5 hours
     if fetch_all:
-        range_clause = "start: -inf, stop: time(v: int(v: now()) - int(v: duration(v: 1d)))"
-    else:
-        range_clause = '''
-            start: time(v: int(v: now()) - int(v: duration(v: 2d))),
-            stop: time(v: int(v: now()) - int(v: duration(v: 1d)))
+        range_clause = f'''
+            start: -inf,
+            stop: time(v: int(v: now()) + {TASHKENT_OFFSET_NANOSECONDS} - int(v: duration(v: 1d)))
         '''
+    else:
+        range_clause = f'''
+            start: time(v: int(v: now()) + {TASHKENT_OFFSET_NANOSECONDS} - int(v: duration(v: 2d))),
+            stop: time(v: int(v: now()) + {TASHKENT_OFFSET_NANOSECONDS} - int(v: duration(v: 1d)))
+        '''
+
         last_filter = "|> last()"
 
     def generate_flux_query(field, agg_fn, agg_label):

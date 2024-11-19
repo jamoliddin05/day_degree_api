@@ -24,8 +24,6 @@ def fetch_data_from_influxdb(station_id, fetch_all=False):
         fetch_all=fetch_all
     )
 
-    print(query)
-
     start_time = time.time()
     # Query InfluxDB and get the result
     result = client.query_api().query(org=org, query=query)

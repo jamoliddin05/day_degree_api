@@ -94,4 +94,4 @@ def process_station_data(station_ids, fetch_all):
 
 
 if __name__ == "__main__":
-    process_station_data(station_ids, fetch_all=False)
+    process_station_data(station_ids, fetch_all=True)
