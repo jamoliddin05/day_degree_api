@@ -19,4 +19,4 @@ def persist_station_data(station_id_to_fetch):
     json_results = json.dumps(results_dict, default=str)  # default=str to handle non-serializable data types
     session.close()
 
-    return json_results
+    return results_dict

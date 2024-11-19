@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify
-from test import persist_station_data
+from pest_models.gens import fetch_data
 
 app = Flask(__name__)
 
@@ -17,7 +17,7 @@ def fetch_station_data(id):
     if not station_id_to_fetch:
         return jsonify({"error": "stationID is required"}), 400
 
-    return jsonify(persist_station_data(station_id_to_fetch))
+    return jsonify(fetch_data(station_id_to_fetch))
 
 
 if __name__ == '__main__':
