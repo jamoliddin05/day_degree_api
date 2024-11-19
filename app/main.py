@@ -1,7 +1,11 @@
 from flask import Flask, request, jsonify
-from pest_models.gens import fetch_data
+from sqlalchemy.orm import Session
+from database.connect import engine
+from gens import calculate_day_degrees
 
 app = Flask(__name__)
+
+session = Session(bind=engine)
 
 
 @app.route('/')
@@ -9,15 +13,9 @@ def hello_world():
     return 'Hello, Docker with Gunicorn and Reloading'
 
 
-@app.route('/stationID/<string:id>', methods=['GET'])
-def fetch_station_data(id):
-    # Step 1: Get the stationID from the request body
-    station_id_to_fetch = id
-
-    if not station_id_to_fetch:
-        return jsonify({"error": "stationID is required"}), 400
-
-    return jsonify(fetch_data(station_id_to_fetch))
+@app.route('/stationID/<string:stationID>/pestID/<string:pestID>/modelID/<string:modelID>', methods=['GET'])
+def fetch_station_data(stationID, pestID, modelID):
+    return f"{calculate_day_degrees(stationID, pestID)}"
 
 
 if __name__ == '__main__':

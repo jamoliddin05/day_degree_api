@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, Boolean, Text, DateTime, Date, JSON, func
+from sqlalchemy import Column, Integer, String, Float, Boolean, Text, DateTime, Date, JSON, ForeignKey, func
 from sqlalchemy.orm import declarative_base
 
 Base = declarative_base()
@@ -107,4 +107,39 @@ class Models(Base):
     def __repr__(self):
         return (
             f"<Models(id={self.id}, name={self.name}"
+        )
+
+
+class ModelPredictions(Base):
+    __tablename__ = "model_predictions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+
+    # Foreign keys pointing to existing tables
+    pestID = Column(Integer, ForeignKey("pests.id"), nullable=False)
+    modelID = Column(Integer, ForeignKey("models.id"), nullable=False)
+    stationID = Column(Integer, ForeignKey("station_stats.id"), nullable=False)
+
+    predictionDate = Column(Date, nullable=False)
+
+    # Data columns
+    generations = Column(Float, nullable=True)
+    adjusted_generations = Column(Float, nullable=True)
+    curDD = Column(Float, nullable=True)  # Current Degree Days
+    cumDD = Column(Float, nullable=True)  # Cumulative Degree Days
+    adult = Column(Float, nullable=True)
+    egg = Column(Float, nullable=True)
+    larvae = Column(Float, nullable=True)
+    pupa = Column(Float, nullable=True)
+    developmentDays = Column(Integer, nullable=True)
+
+    # Timestamps
+    created_at = Column(DateTime, nullable=False, default=func.now())
+    updated_at = Column(DateTime, nullable=False, default=func.now(), onupdate=func.now())
+
+    def __repr__(self):
+        return (
+            f"<ModelPredictions("
+            f"id={self.id}, pestID={self.pestID}, modelID={self.modelID}, "
+            f"stationID={self.stationID}, predictionDate={self.predictionDate})>"
         )

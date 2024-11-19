@@ -1,105 +1,73 @@
+from database.connect import *
 import pandas as pd
-from sqlalchemy import create_engine, MetaData, Table
-from sqlalchemy.orm import sessionmaker
-from database.connect import engine
-import json
-from sqlalchemy import inspect
-import os
-import matplotlib.pyplot as plt
+from itertools import accumulate
 import numpy as np
 
-
-def fetch_data(station_id_to_fetch, pest_id_to_fetch='1'):
-    metadata = MetaData()
-    station_stats_table = Table('station_stats', metadata, autoload_with=engine)
-    pests_table = Table('pests', metadata, autoload_with=engine)
-
-    Session = sessionmaker(bind=engine)
-    session = Session()
-
-    results_station_stats = session.query(station_stats_table).filter(
-        station_stats_table.c.stationID == station_id_to_fetch).all()
-    results_pests = session.query(pests_table).filter(pests_table.c.id == pest_id_to_fetch).all()
-
-    results_station_stats_dict = [station._asdict() for station in results_station_stats]
-    results_pests_dict = [pest._asdict() for pest in results_pests]
-
-    calculate_pest_gens(results_station_stats_dict, results_pests_dict)
-
-    json_results = json.dumps(results_station_stats_dict,
-                              default=str)  # default=str to handle non-serializable data types
-    session.close()
-
-    return json_results
+stations_table_name = 'station_stats'  # Replace with your actual table name
+pests_table_name = 'pests'
+models_table_name = 'models'
 
 
-def calculate_pest_gens(results_station_stats_dict, results_pests_dict):
-    df_station = pd.DataFrame.from_dict(results_station_stats_dict)
-    df_pest = pd.DataFrame(results_pests_dict)
+def fetch_and_convert_df(table_name, id, condition):
+    table = Table(table_name, metadata, autoload_with=engine)
+    stmt = select(table).where(condition(table, id))
+    results = session.execute(stmt).fetchall()
+    df = pd.DataFrame([result._asdict() for result in results])
 
-    pest_base_temp = df_pest['baseTemperature'].iloc[0]
-    pest_max_temp = df_pest['maxTemperature'].iloc[0]
-    pest_total_temp = df_pest['totalTemperature'].iloc[0]
-    pest_ideal_hum = df_pest['idealHumidity'].iloc[0]
+    return df
 
-    df_station.set_index("measurementDate", inplace=True)
 
-    full_index = pd.date_range(start=df_station.index.min(), end=df_station.index.max(), freq="D")
-    df_station = df_station.reindex(full_index)
+def station_condition(table, id):
+    return table.c.stationID == id
 
-    # Interpolate missing values linearly
-    df_station = df_station.interpolate(method="linear")
+
+def pest_condition(table, id):
+    return table.c.id == id
+
+
+def model_condition(table, id):
+    return table.c.id == id
+
+
+def calculate_day_degrees(station_id, pest_id):
+    station_df = fetch_and_convert_df(stations_table_name, station_id, station_condition)
+    pest_df = fetch_and_convert_df(pests_table_name, pest_id, pest_condition)
+
+    pest_base_temp = pest_df['baseTemperature'].iloc[0]
+    pest_max_temp = pest_df['maxTemperature'].iloc[0]
+    pest_total_temp = pest_df['totalTemperature'].iloc[0]
+    pest_ideal_hum = pest_df['idealHumidity'].iloc[0]
 
     day_degrees = []
-    for day_min, day_max in zip(df_station['minAirT'].values, df_station['maxAirT'].values):
-        t_min = max(day_min, pest_base_temp)
-        t_max = min(day_max, pest_max_temp)
-        day_degree = max(0, ((t_min + t_max) / 2) - pest_base_temp)
-        day_degrees.append(day_degree)
-    df_station['day_degree'] = day_degrees
+    for day_min, day_max in zip(station_df['minAirT'].values, station_df['maxAirT'].values):
+        temp_min = max(day_min, pest_base_temp)
+        temp_max = min(day_max, pest_max_temp)
+        day_degree = max(0, ((temp_min + temp_max) / 2) - pest_base_temp)
+        day_degrees.append(round(day_degree, 2))
+
+    cum_dds = list(accumulate(day_degrees))
+    cum_dds = [round(value, 2) for value in cum_dds]
 
     gens = []
-    cumulative = 0
-    for day_degree in df_station['day_degree'].values:
-        cumulative = cumulative + day_degree
-        gen = cumulative / pest_total_temp
+    for cum_dd in cum_dds:
+        gen = cum_dd / pest_total_temp
         gens.append(gen)
-    df_station['gen'] = gens
+    gens = [round(value, 2) for value in gens]
 
     adj_day_degrees = []
-    for day_hum, day_degree in zip(df_station['meanAirH'].values, df_station['day_degree'].values):
+    for day_hum, day_degree in zip(station_df['meanAirH'].values, day_degrees):
         alpha = np.exp(-(((day_hum - pest_ideal_hum) / 30) ** 2))
         adj_day_degree = day_degree * alpha
-        adj_day_degrees.append(adj_day_degree)
-    df_station['adj_day_degree'] = adj_day_degrees
+        adj_day_degrees.append(round(adj_day_degree, 2))
+
+    cum_adj_dds = list(accumulate(adj_day_degrees))
+    cum_adj_dds = [round(value, 2) for value in cum_adj_dds]
 
     adj_gens = []
-    cumulative = 0
-    for adj_day_degree in df_station['adj_day_degree'].values:
-        cumulative = cumulative + adj_day_degree
-        adj_gen = cumulative / pest_total_temp
+    for cum_adj_day_degree in cum_adj_dds:
+        adj_gen = cum_adj_day_degree / pest_total_temp
         adj_gens.append(adj_gen)
-    df_station['adj_gen'] = adj_gens
 
-    # Plotting the 'day_degree' column against the index (or another column, like 'date')
-    plt.figure(figsize=(10, 6))
-    plt.plot(df_station.index, df_station['gen'], label='Generations', color='b')
-    plt.plot(df_station.index, df_station['adj_gen'], label='Adjusted Generations', color='r')
+    adj_gens = [round(value, 2) for value in adj_gens]
 
-    # Adding labels and title
-    plt.xlabel('Date')  # or you can use 'Index' if the index represents dates
-    plt.ylabel('Generations')
-    plt.title('Generations over time')
-    plt.legend()
-
-    file_path = 'generations_plot.png'  # Modify the filename or provide a full path if needed
-    plt.savefig(file_path, dpi=300, bbox_inches='tight')
-
-    # Confirm if the file is saved
-    if os.path.exists(file_path):
-        print(f"Plot saved successfully as {file_path}")
-    else:
-        print("Failed to save the plot.")
-
-
-fetch_data('107052024')
+    return day_degrees, cum_dd, gens, adj_gens
